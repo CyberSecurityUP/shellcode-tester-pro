@@ -32,6 +32,8 @@ class ShellcodeTesterPro(QWidget):
         self.init_ui()
         self.plugin_refs = {}  # Plugins carregados dinamicamente
         self.loaded_plugins = []  # Plugins já ativos
+        self.suspect_shellcode = b""
+
 
 
     def set_dark_theme(self):
@@ -66,30 +68,31 @@ class ShellcodeTesterPro(QWidget):
         self.memory_tab = self.create_memory_tab()
         self.step_tab = self.create_step_tab()
         self.remote_tab = self.create_remote_tab()
-        self.pdf_tab = self.create_pdf_tab()
+   #     self.pdf_tab = self.create_pdf_tab()
         self.capstone_tab = self.create_analysis_tab()
         self.info_tab = self.create_info_tab()
         self.loaded_plugins = []
         self.tabs = tabs 
         self.load_plugins()
         self.evasion_tab = self.create_evasion_tab()
+        self.binary_tab = self.create_binary_tab()
+
 
 
 
         # Adiciona abas
-        tabs.addTab(self.execution_tab, "Execução")
+        tabs.addTab(self.execution_tab, "Importação e Execução")
         tabs.addTab(self.unicorn_tab, "Emulador Unicorn")
         tabs.addTab(self.sandbox_tab, "Sandbox Heurística")
         tabs.addTab(self.deobfuscation_tab, "Desofuscação e Criptografia")
         tabs.addTab(self.memory_tab, "Dump de Memória Hex")
         tabs.addTab(self.step_tab, "Execução Passo a Passo")
         tabs.addTab(self.remote_tab, "Shellcode Remoto")
-        tabs.addTab(self.pdf_tab, "Exportar PDF")
+      #  tabs.addTab(self.pdf_tab, "Exportar PDF")
         tabs.addTab(self.capstone_tab, "Disassembly")
         tabs.addTab(self.info_tab, "Fingerprint")
         tabs.addTab(self.evasion_tab, "Análise de Evasão")
-
-
+        tabs.addTab(self.binary_tab, "Análise de Binário")
         layout.addWidget(tabs)
         self.setLayout(layout)
 
@@ -129,6 +132,92 @@ class ShellcodeTesterPro(QWidget):
                     except Exception as e:
                         print(f"[!] Erro ao carregar {filename}: {e}")
 
+    def create_binary_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout()
+
+        self.binary_output = QTextEdit()
+        self.binary_output.setReadOnly(True)
+
+        self.load_binary_btn = QPushButton("Carregar ELF ou EXE")
+        self.load_binary_btn.clicked.connect(self.analyze_binary_file)
+
+        self.export_shellcode_btn = QPushButton("Exportar Shellcode Suspeito")
+        self.export_shellcode_btn.setEnabled(False)
+        self.export_shellcode_btn.clicked.connect(self.export_extracted_shellcode)
+
+        layout.addWidget(QLabel("Análise de Binários ELF / EXE"))
+        layout.addWidget(self.load_binary_btn)
+        layout.addWidget(self.export_shellcode_btn)
+        layout.addWidget(self.binary_output)
+        tab.setLayout(layout)
+
+        return tab
+
+    def analyze_binary_file(self):
+        self.binary_output.clear()
+        self.suspect_shellcodes = []
+
+        file_path, _ = QFileDialog.getOpenFileName(self, "Abrir arquivo ELF ou EXE", "", "Executáveis (*.exe *.bin *.elf *.out)")
+        if not file_path:
+            self.binary_output.setText("[!] Nenhum arquivo selecionado.")
+            return
+
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+
+            self.binary_output.append(f"[+] Arquivo carregado: {file_path}")
+            self.binary_output.append(f"[+] Tamanho: {len(data)} bytes")
+
+            findings = []
+
+            if b"VirtualAlloc" in data or b"CreateThread" in data:
+                findings.append("[!] API Windows detectada (possível shellcode)")
+            if b"/bin/sh" in data:
+                findings.append("[!] String '/bin/sh' detectada")
+            if b"mmap" in data:
+                findings.append("[!] mmap detectado")
+            if data.count(b"\x90") > 50:
+                findings.append("[!] NOP sled detectado (> 50 bytes)")
+
+            hex_patterns = re.findall(rb'(?:\\x[0-9a-fA-F]{2}){10,}', data)
+            if hex_patterns:
+                findings.append(f"[!] {len(hex_patterns)} buffer(s) hex inline encontrados")
+
+            blocks = re.findall(rb'([\x90-\xff]{30,})', data)
+            for idx, block in enumerate(blocks):
+                self.suspect_shellcodes.append(block)
+
+            if blocks:
+                findings.append(f"[!] {len(blocks)} bloco(s) binários suspeitos encontrados")
+                for i, b in enumerate(blocks[:3]):  # Mostra até 3 previews
+                    preview = ' '.join(f"{byte:02x}" for byte in b[:32])
+                    self.binary_output.append(f"[+] Bloco {i+1} ({len(b)} bytes): {preview}...")
+
+            if not findings:
+                self.binary_output.append("[*] Nenhum padrão suspeito encontrado.")
+            else:
+                self.binary_output.append("\n".join(findings))
+
+            if self.suspect_shellcodes:
+                self.export_shellcode_btn.setEnabled(True)
+
+        except Exception as e:
+            self.binary_output.setText(f"[!] Erro ao analisar: {str(e)}")
+
+
+    def export_extracted_shellcode(self):
+        try:
+            base_path, _ = QFileDialog.getSaveFileName(self, "Salvar Shellcode", "shellcode_extraido", "Arquivos binários (*.bin)")
+            if base_path:
+                for i, blob in enumerate(self.suspect_shellcodes):
+                    filename = f"{base_path}_part{i+1}.bin"
+                    with open(filename, "wb") as f:
+                        f.write(blob)
+                self.binary_output.append(f"[+] {len(self.suspect_shellcodes)} shellcodes exportados para arquivos!")
+        except Exception as e:
+            self.binary_output.append(f"[!] Erro ao salvar shellcodes: {str(e)}")
 
 
     def create_analysis_tab(self):
@@ -155,15 +244,73 @@ class ShellcodeTesterPro(QWidget):
         tab.setLayout(layout)
         return tab
 
+    def detect_arch_and_mode(self, data: bytes):
+        if b"\x0f\x05" in data or b"\x48" in data:
+            return CS_ARCH_X86, CS_MODE_64
+        elif b"\xcd\x80" in data:
+            return CS_ARCH_X86, CS_MODE_32
+        elif b"\x00\xf0\x20\xe3" in data or b"\x01\x00\xa0\xe3" in data:
+            return CS_ARCH_ARM, CS_MODE_ARM
+        elif b"\x20\x00\x80\xd2" in data:  # mov x0, #0 (aarch64)
+            return CS_ARCH_ARM64, CS_MODE_ARM
+        else:
+            return CS_ARCH_X86, CS_MODE_64  # fallback
+
     def analyze_capstone(self):
+        self.analysis_output.clear()
+        raw = self.analysis_input.toPlainText().strip()
+
+        if not raw:
+            self.analysis_output.setText("[!] Nenhum shellcode fornecido.")
+            return
+
         try:
-            code = self.analysis_input.toPlainText().replace("\\x", "").replace(" ", "")
-            shellcode = bytes.fromhex(code)
-            md = Cs(CS_ARCH_X86, CS_MODE_64)
-            result = "\n".join(f"0x{i.address:x}:\t{i.mnemonic}\t{i.op_str}" for i in md.disasm(shellcode, 0x1000))
-            self.analysis_output.setPlainText(result)
+            # Tratamento igual ao parser global
+            import re
+            cleaned = raw.replace('"', '').replace("'", "").replace(';', '')
+            cleaned = re.sub(r"[\n\r\t,]", "", cleaned)
+
+            if "\\x" in cleaned:
+                hex_str = cleaned.replace("\\x", "")
+            else:
+                hex_str = re.sub(r"[^0-9a-fA-F]", "", cleaned)
+
+            if not re.fullmatch(r"[0-9a-fA-F]+", hex_str):
+                self.analysis_output.setText("[!] Shellcode contém caracteres inválidos.")
+                return
+
+            if len(hex_str) % 2 != 0:
+                hex_str = "0" + hex_str
+
+            data = bytes.fromhex(hex_str)
+
+            arch, mode = self.detect_arch_and_mode(data)
+            md = Cs(arch, mode)
+            md.detail = True
+
+            result = []
+            suspicious = []
+
+            for i in md.disasm(data, 0x1000):
+                line = f"0x{i.address:08x}: {i.bytes.hex():<20} {i.mnemonic:<7} {i.op_str}"
+                result.append(line)
+                if i.mnemonic in ["syscall", "int", "call"] or "exec" in i.op_str.lower():
+                    suspicious.append(line)
+
+            self.analysis_output.append(f"[+] Arquitetura detectada: {arch} | Modo: {mode}")
+            self.analysis_output.append(f"[+] Total de instruções: {len(result)}\n")
+
+            if suspicious:
+                self.analysis_output.append("[!] Instruções suspeitas:")
+                self.analysis_output.append("\n".join(suspicious))
+                self.analysis_output.append("")
+
+            self.analysis_output.append("[+] Disassembly completo:")
+            self.analysis_output.append("\n".join(result))
+
         except Exception as e:
-            self.analysis_output.setPlainText(f"[!] Erro: {str(e)}")
+            self.analysis_output.setText(f"[!] Erro: {str(e)}")
+
 
     def export_analysis_result(self):
         try:
@@ -191,62 +338,63 @@ class ShellcodeTesterPro(QWidget):
         except Exception as e:
             self.load_bin_output.setPlainText(f"[!] Erro: {str(e)}")
 
-    def create_pdf_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
+    
+  #  def create_pdf_tab(self):
+   #     tab = QWidget()
+    #    layout = QVBoxLayout()
+#
+ #       self.pdf_output = QTextEdit()
+  #      self.pdf_output.setReadOnly(True)
 
-        self.pdf_output = QTextEdit()
-        self.pdf_output.setReadOnly(True)
+#        export_btn = QPushButton("Exportar Shellcode e Análises para PDF")
+ #       export_btn.clicked.connect(self.export_to_pdf)
+#
+ #       layout.addWidget(QLabel("Exportação de Relatório em PDF"))
+  #      layout.addWidget(export_btn)
+   #     layout.addWidget(self.pdf_output)
+    #    tab.setLayout(layout)
+     #   return tab ###
+    #
+    #def export_to_pdf(self):
+     #   try:
+      #      shellcode = self.shellcode_input.toPlainText().strip()
+       #     pdf = FPDF()
+        #    pdf.add_page()
+         #   pdf.set_font("Arial", size=12)
+          #  pdf.cell(200, 10, txt="Shellcode Tester Pro - Relatório", ln=True, align="C")
+           # pdf.ln(10)
+#
+ #           pdf.multi_cell(0, 10, txt=f"Shellcode:")
+  #          pdf.set_font("Courier", size=10)
+   #         pdf.multi_cell(0, 10, txt=shellcode)
+#
+ #           pdf.ln(5)
+  #          pdf.set_font("Arial", size=12)
+   #         pdf.multi_cell(0, 10, txt="--- Análise Heurística ---")
+    #        pdf.set_font("Courier", size=10)
+     #       pdf.multi_cell(0, 10, txt=self.sandbox_output.toPlainText())
+#
+ #           pdf.ln(5)
+  #          pdf.set_font("Arial", size=12)
+   #         pdf.multi_cell(0, 10, txt="--- Desofuscação ---")
+    #        pdf.set_font("Courier", size=10)
+     #       pdf.multi_cell(0, 10, txt=self.deob_output.toPlainText())
+#
+ #           pdf.ln(5)
+  #          pdf.set_font("Arial", size=12)
+   #         pdf.multi_cell(0, 10, txt="--- Memória Hex ---")
+    #        pdf.set_font("Courier", size=10)
+     #       pdf.multi_cell(0, 10, txt=self.mem_output.toPlainText())
 
-        export_btn = QPushButton("Exportar Shellcode e Análises para PDF")
-        export_btn.clicked.connect(self.export_to_pdf)
-
-        layout.addWidget(QLabel("Exportação de Relatório em PDF"))
-        layout.addWidget(export_btn)
-        layout.addWidget(self.pdf_output)
-        tab.setLayout(layout)
-        return tab
-
-    def export_to_pdf(self):
-        try:
-            shellcode = self.shellcode_input.toPlainText().strip()
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt="Shellcode Tester Pro - Relatório", ln=True, align="C")
-            pdf.ln(10)
-
-            pdf.multi_cell(0, 10, txt=f"Shellcode:")
-            pdf.set_font("Courier", size=10)
-            pdf.multi_cell(0, 10, txt=shellcode)
-
-            pdf.ln(5)
-            pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 10, txt="--- Análise Heurística ---")
-            pdf.set_font("Courier", size=10)
-            pdf.multi_cell(0, 10, txt=self.sandbox_output.toPlainText())
-
-            pdf.ln(5)
-            pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 10, txt="--- Desofuscação ---")
-            pdf.set_font("Courier", size=10)
-            pdf.multi_cell(0, 10, txt=self.deob_output.toPlainText())
-
-            pdf.ln(5)
-            pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 10, txt="--- Memória Hex ---")
-            pdf.set_font("Courier", size=10)
-            pdf.multi_cell(0, 10, txt=self.mem_output.toPlainText())
-
-            file_path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "shellcode_report.pdf", "PDF Files (*.pdf)")
-            if file_path:
-                pdf.output(file_path)
-                self.pdf_output.setText(f"[+] Relatório PDF salvo com sucesso: {file_path}")
-            else:
-                self.pdf_output.setText("[!] Caminho de arquivo não escolhido.")
-
-        except Exception as e:
-            self.pdf_output.setText(f"[!] Erro ao gerar PDF: {str(e)}")
+      #      file_path, _ = QFileDialog.getSaveFileName(self, "Salvar PDF", "shellcode_report.pdf", "PDF Files (*.pdf)")
+       #     if file_path:
+        #        pdf.output(file_path)
+         #       self.pdf_output.setText(f"[+] Relatório PDF salvo com sucesso: {file_path}")
+          #  else:
+           #     self.pdf_output.setText("[!] Caminho de arquivo não escolhido.")
+#
+ #       except Exception as e:
+  #          self.pdf_output.setText(f"[!] Erro ao gerar PDF: {str(e)}")
 
     def create_step_tab(self):
         tab = QWidget()
