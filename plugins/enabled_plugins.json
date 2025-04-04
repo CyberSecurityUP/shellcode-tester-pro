@@ -1,0 +1,5 @@
+{
+    "hello_plugin.py": false,
+    "syscall_logger.py": false,
+    "yara_scanner.py": false
+}
