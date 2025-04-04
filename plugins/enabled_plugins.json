@@ -1,5 +1,6 @@
 {
     "hello_plugin.py": false,
     "syscall_logger.py": false,
-    "yara_scanner.py": false
+    "yara_scanner.py": false,
+    "virustotal_plugin.py": true
 }
