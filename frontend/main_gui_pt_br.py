@@ -17,7 +17,7 @@ import subprocess
 import os
 import importlib.util
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from plugins import plugin_manager
+from plugins import plugin_manager_portuguese
 import json
 import re
 
