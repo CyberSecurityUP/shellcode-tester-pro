@@ -44,7 +44,7 @@ See [docs/plugins.md](docs/plugins.md) to create your own plugin and extend the 
 
 Shellcode Tester Pro é uma ferramenta com interface gráfica para análise, execução simulada e engenharia reversa de shellcodes maliciosos.
 
-![Screenshot](docs/screenshot.png)
+![image](https://github.com/user-attachments/assets/8893c547-4cd0-465b-88b9-e38a7378a4c4)
 
 ## Funcionalidades
 
