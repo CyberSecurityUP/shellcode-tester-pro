@@ -103,8 +103,11 @@ class ShellcodeTesterPro(QWidget):
     def toggle_theme(self):
         if self.dark_mode:
             self.set_light_theme()
+            self.dark_mode = False
         else:
             self.set_dark_theme()
+            self.dark_mode = True
+
 
     def load_plugins(self):
         plugins_path = os.path.join(os.path.dirname(__file__), "plugins")
@@ -326,18 +329,21 @@ class ShellcodeTesterPro(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Erro", str(e))
 
-    def load_bin(self):
+    def load_shellcode_bin(self):
         try:
-            file_path, _ = QFileDialog.getOpenFileName(self, "Abrir Arquivo .bin", "", "Arquivos Binários (*.bin)")
-            if file_path:
-                with open(file_path, "rb") as f:
-                    data = f.read()
-                    hexcode = " ".join(f"{b:02x}" for b in data)
-                    self.shellcode_input.setPlainText(hexcode.replace(" ", ""))
-                    self.load_bin_output.setPlainText(hexcode)
-        except Exception as e:
-            self.load_bin_output.setPlainText(f"[!] Erro: {str(e)}")
+            file, _ = QFileDialog.getOpenFileName(self, "Abrir Arquivo Binário", "", "Arquivos Binários (*.bin *.exe *.elf)")
+            if not file:
+                self.exec_output.append("[!] Nenhum arquivo selecionado.")
+                return
 
+            with open(file, "rb") as f:
+                data = f.read()
+                hexcode = ''.join(f'\\x{b:02x}' for b in data)
+                self.shellcode_input.setPlainText(hexcode)
+                self.exec_output.append(f"[+] Arquivo carregado: {file} ({len(data)} bytes)")
+
+        except Exception as e:
+            self.exec_output.append(f"[!] Erro ao carregar arquivo: {str(e)}")
     
   #  def create_pdf_tab(self):
    #     tab = QWidget()
@@ -422,15 +428,16 @@ class ShellcodeTesterPro(QWidget):
         layout.addWidget(QLabel("Shellcode:"))
         layout.addWidget(self.shellcode_input)
 
+        # Botões de ação
         button_layout = QHBoxLayout()
 
         run_btn = QPushButton("Executar (Simulado)")
         run_btn.clicked.connect(self.simulate_execution)
         button_layout.addWidget(run_btn)
 
-        load_bin_btn = QPushButton("Carregar Arquivo .bin")
-        load_bin_btn.clicked.connect(self.load_bin)
-        button_layout.addWidget(load_bin_btn)
+        load_btn = QPushButton("Carregar Arquivo .bin")
+        load_btn.clicked.connect(self.load_shellcode_bin)
+        button_layout.addWidget(load_btn)
 
         layout.addLayout(button_layout)
 
@@ -441,6 +448,7 @@ class ShellcodeTesterPro(QWidget):
 
         tab.setLayout(layout)
         return tab
+
 
     def create_remote_tab(self):
         tab = QWidget()
