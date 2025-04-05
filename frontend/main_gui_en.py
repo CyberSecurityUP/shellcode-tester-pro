@@ -842,28 +842,31 @@ class ShellcodeTesterProEn(QWidget):
 
     def simulate_execution(self):
         self.exec_output.clear()
-    
+
         shellcode_bytes, error = self.get_shellcode_bytes()
         if error:
             self.exec_output.append(error)
             return
-    
+
         try:
-            self.exec_output.append(f"[+] Shellcode successfully formatted ({len(shellcode_bytes)} bytes).")
-    
+            self.exec_output.append(f"[+] Shellcode formatted successfully ({len(shellcode_bytes)} bytes).")
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp:
                 tmp.write(shellcode_bytes)
                 tmp_path = tmp.name
-    
+
             self.exec_output.append(f"[+] Shellcode saved to: {tmp_path}")
-    
-            runner_path = os.path.abspath("runner.py")
+
+            # Absolute path to runner_english.py in backend folder
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            runner_path = os.path.join(base_dir, "backend", "runner_english.py")
+
             if not os.path.isfile(runner_path):
-                self.exec_output.append(f"[!] runner.py not found at: {runner_path}")
+                self.exec_output.append(f"[!] runner_english.py not found at: {runner_path}")
                 return
-    
-            self.exec_output.append("[*] Launching runner.py in external terminal...")
-    
+
+            self.exec_output.append("[*] Running runner_english.py in external terminal...")
+
             if os.system("which gnome-terminal") == 0:
                 term_cmd = ["gnome-terminal", "--", "python3", runner_path, tmp_path]
             elif os.system("which xterm") == 0:
@@ -873,12 +876,13 @@ class ShellcodeTesterProEn(QWidget):
             else:
                 self.exec_output.append("[!] No compatible terminal found.")
                 return
-    
+
             subprocess.Popen(term_cmd)
-            self.exec_output.append("[+] Shellcode is running in another terminal.")
-    
+            self.exec_output.append("[+] Shellcode is now running in a new terminal.")
+
         except Exception as e:
             self.exec_output.append(f"[!] Error: {str(e)}")
+
 
 
 
