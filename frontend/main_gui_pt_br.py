@@ -902,7 +902,6 @@ class ShellcodeTesterProBr(QWidget):
 
             self.exec_output.append(f"[+] Shellcode salvo em: {tmp_path}")
 
-            # Caminho absoluto para o runner_portuguese.py na pasta backend
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             runner_path = os.path.join(base_dir, "backend", "runner_portuguese.py")
 
