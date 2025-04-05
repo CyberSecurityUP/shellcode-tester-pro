@@ -4,6 +4,7 @@ install:
 		python3-pyqt5 \
 		libcapstone-dev \
 		libunicorn-dev \
+		nasm \
 		x11-utils x11-xserver-utils xterm gnome-terminal konsole \
 		build-essential libx11-dev libxcb1-dev libxext-dev libxrender-dev
 
