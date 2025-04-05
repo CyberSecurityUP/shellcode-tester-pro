@@ -1052,6 +1052,8 @@ class ShellcodeTesterPro(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    tester = ShellcodeTesterPro()
-    tester.show()
+    from splash_screen import SplashScreen
+    splash = SplashScreen()
+    splash.show()
     sys.exit(app.exec_())
+
