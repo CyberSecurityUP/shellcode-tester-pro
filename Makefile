@@ -10,6 +10,7 @@ install:
 	pip3 install -r requirements.txt
 
 run:
+	export XDG_RUNTIME_DIR="/run/user/$(id -u)"   
 	python3 main_gui.py
 
 clean:
