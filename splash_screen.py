@@ -63,6 +63,6 @@ class SplashScreen(QWidget):
             self.launch_main_app()
 
     def launch_main_app(self):
-        from main_gui import ShellcodeTesterPro
-        self.main = ShellcodeTesterPro()
-        self.main.show()
+        from language_selector import LanguageSelector
+        self.selector = LanguageSelector()
+        self.selector.show()
