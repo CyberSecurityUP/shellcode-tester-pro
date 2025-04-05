@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python3 main_gui.py
+python3 main.py
 ```
 
 ## Developing Plugins
@@ -69,7 +69,7 @@ pip install -r requirements.txt
 ## Execução
 
 ```bash
-python3 main_gui.py
+python3 main.py
 ```
 
 ## Desenvolvendo Plugins
