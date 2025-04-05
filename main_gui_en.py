@@ -16,7 +16,7 @@ import tempfile
 import subprocess
 import os
 import importlib.util
-from plugins import plugin_manager
+from plugins import plugin_manager_english
 import json
 import re
 import hashlib
