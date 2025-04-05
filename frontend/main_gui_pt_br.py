@@ -902,12 +902,15 @@ class ShellcodeTesterProBr(QWidget):
 
             self.exec_output.append(f"[+] Shellcode salvo em: {tmp_path}")
 
-            runner_path = os.path.abspath("runner.py")
+            # Caminho absoluto para o runner_portuguese.py na pasta backend
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            runner_path = os.path.join(base_dir, "backend", "runner_portuguese.py")
+
             if not os.path.isfile(runner_path):
-                self.exec_output.append(f"[!] runner.py não encontrado em: {runner_path}")
+                self.exec_output.append(f"[!] runner_portuguese.py não encontrado em: {runner_path}")
                 return
 
-            self.exec_output.append("[*] Executando runner.py em terminal externo...")
+            self.exec_output.append("[*] Executando runner_portuguese.py em terminal externo...")
 
             if os.system("which gnome-terminal") == 0:
                 term_cmd = ["gnome-terminal", "--", "python3", runner_path, tmp_path]
@@ -924,6 +927,8 @@ class ShellcodeTesterProBr(QWidget):
 
         except Exception as e:
             self.exec_output.append(f"[!] Erro: {str(e)}")
+
+
 
 
     def run_unicorn(self):
